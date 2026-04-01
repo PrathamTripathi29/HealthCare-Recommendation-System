@@ -45,24 +45,39 @@ def recommend(query: HospitalQuery):
             query.latitude,
             query.longitude,
             row["latitude"],
-            row["longitude"]
+            row["longitude"],
         ),
-        axis = 1
+        axis = 1,
     )
 
     df = df[df["distance"] <= query.max_distance]
 
-    df["final_score"] = df["score"] - 0.05 * df["distance"]
+    baseline_score_col = (
+        "rule_score_overall" if "rule_score_overall" in df.columns else "score"
+    )
+    # Distance penalty keeps relevance to the user location.
+    df["final_score"] = df[baseline_score_col] - 0.05 * df["distance"]
+
 
     df = df.sort_values("final_score", ascending=False)
 
     df = df.head(query.top_n)
 
-    return df[[
+    response_columns =[
         "name",
         "latitude",
         "longitude",
-        "score",
+        baseline_score_col,
         "distance",
-        "final_score"
-    ]].to_dict(orient="records")
+        "final_score",
+    ]
+
+    phase_a_columns = [
+        "rule_socre_feature_quality",
+        "rule_score_feature_capacity",
+        "rule_score_feature_affordability",
+        "rule_score_feature_specialty",
+    ]
+
+    response_columns.extend([col for col in phase_a_columns if col in df.columns])
+    return df[response_columns].to_dict(orient="records")
